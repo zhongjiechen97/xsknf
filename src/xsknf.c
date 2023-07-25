@@ -360,24 +360,28 @@ static void load_ebpf_programs(char *path, struct bpf_object **obj,
 {
 	struct bpf_program *xdp_prog, *tc_prog;
 	int fd;
-	struct bpf_prog_load_attr prog_load_attr = {
-		.file = path
-	};
+	int err;
 
-	if (bpf_prog_load_xattr(&prog_load_attr, obj, &fd)) {
+	*obj = bpf_object__open_file(path, NULL);
+	if (!*obj) {
 		fprintf(stderr, "ERROR: unable to parse eBPF file\n");
 		exit(EXIT_FAILURE);
 	}
-
-	xdp_prog = bpf_object__find_program_by_name(*obj, xdp_progname);
+	xdp_prog = bpf_object__next_program(*obj, NULL);
 	if (!xdp_prog) {
 		fprintf(stderr, "ERROR: no '%s' xdp program found\n", xdp_progname);
 		exit(EXIT_FAILURE);
 	}
+	bpf_program__set_type(xdp_prog, BPF_PROG_TYPE_XDP);
+	err = bpf_object__load(*obj);
+	if(err){
+		fprintf(stderr, "ERROR: unable to load eBPF file\n");
+		exit(EXIT_FAILURE);
+	}
 
 	for (int i = 0; i < conf.num_interfaces; i++) {
-		if (bpf_set_link_xdp_fd(ifindexes[i], bpf_program__fd(xdp_prog),
-				conf.xdp_flags) < 0) {
+		if (bpf_xdp_attach(ifindexes[i], bpf_program__fd(xdp_prog),
+				conf.xdp_flags, NULL) < 0) {
 			fprintf(stderr, "ERROR: failed setting xdp program on %s\n",
 					conf.interfaces[i]);
 			exit(EXIT_FAILURE);
@@ -1034,7 +1038,7 @@ int xsknf_cleanup()
 	}
 
 	for (int i = 0; i < conf.num_interfaces; i++) {
-		bpf_set_link_xdp_fd(ifindexes[i], -1, conf.xdp_flags);
+		bpf_xdp_attach(ifindexes[i], -1, conf.xdp_flags, NULL);
 	}
 	if (egress_ebpf_program) {
 		del_clsact_qdiscs();
