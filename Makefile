@@ -79,7 +79,7 @@ llvm-check: $(CLANG) $(LLC)
 
 $(OBJECT_LIBBPF): update_submodules $(LIBBPF_SOURCES)
 	$(call color_print,Building libbpf...)
-	$(MAKE) -C $(LIB_DIR) libbpf
+	$(MAKE) -C $(LIB_DIR)/libbpf/src
 
 $(OBJECT_LIBXDP): update_submodules $(LIBXDP_SOURCES)
 	$(call color_print,Building libxdp...)
